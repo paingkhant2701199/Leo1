@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 KEY APPROVAL SYSTEM
-ဒီစနစ်ကို သင့် tool မှာ ထည့်သုံးနိုင်ပါတယ်
 """
 
 import os
@@ -227,6 +226,42 @@ def main():
         return False
 
 # ===============================
+# COMPATIBILITY FUNCTIONS FOR Leo.py
+# ===============================
+
+def get_device_id():
+    """Get device ID for Leo.py compatibility"""
+    return get_system_key()
+
+def login(show_banner=False):
+    """Login function for Leo.py compatibility"""
+    if show_banner:
+        print(f"{bcyan}╔══════════════════════════════════════════════════════════════════╗")
+        print(f"║                    KEY APPROVAL SYSTEM                               ║")
+        print(f"╚══════════════════════════════════════════════════════════════════╝{reset}")
+        print(f"\n{bcyan}[!] Checking approval status...{reset}")
+    
+    system_key = get_system_key()
+    authorized_keys = fetch_authorized_keys()
+    
+    print(f"{white}[*] Device ID: {system_key}{reset}")
+    print(f"{white}[*] Authorized Keys: {len(authorized_keys)}{reset}")
+    
+    if system_key in authorized_keys:
+        if show_banner:
+            print(f"\n{bgreen}╔══════════════════════════════════════════════════════════════════╗")
+            print(f"║                    ✓ KEY APPROVED ✓                                 ║")
+            print(f"╚══════════════════════════════════════════════════════════════════╝{reset}")
+        return True
+    else:
+        if show_banner:
+            print(f"\n{bred}╔══════════════════════════════════════════════════════════════════╗")
+            print(f"║                    ❌ KEY NOT APPROVED ❌                           ║")
+            print(f"╚══════════════════════════════════════════════════════════════════╝{reset}")
+            print(get_approval_message())
+        return False
+
+# ===============================
 # COMMAND LINE INTERFACE
 # ===============================
 
@@ -253,11 +288,11 @@ if __name__ == "__main__":
         elif cmd == "--help":
             print(f"""
 {cyan}Key Approval System - Usage:{reset}
-  python3 approval.py --key      # Show your system key
-  python3 approval.py --check    # Check if approved
-  python3 approval.py --list     # List authorized keys
-  python3 approval.py --add KEY  # Add a key (admin)
-  python3 approval.py            # Run normal check
+  python3 Key_v2.py --key      # Show your system key
+  python3 Key_v2.py --check    # Check if approved
+  python3 Key_v2.py --list     # List authorized keys
+  python3 Key_v2.py --add KEY  # Add a key (admin)
+  python3 Key_v2.py            # Run normal check
 """)
         else:
             print(f"{red}[!] Unknown command: {cmd}{reset}")
