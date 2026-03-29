@@ -24,42 +24,7 @@ import platform
 
 # Disable SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-# ===============================
-# KEY APPROVAL SYSTEM - Leo (No modification to original Key v2.py)
-# ===============================
 
-# Import original key system
-import importlib.util
-import os
-import sys
-
-# Load Key v2.py as a module without renaming it
-key_path = os.path.join(os.path.dirname(__file__), "Key v2.py")
-spec = importlib.util.spec_from_file_location("key_v2", key_path)
-key_v2 = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(key_v2)
-
-def check_approval_before_start():
-    """Check if device is approved before running main tool"""
-    if key_v2.check_approval():
-        print(f"{GREEN}✓ Device already approved! Running main tool...{RESET}")
-        return True
-    else:
-        print(f"{YELLOW}⚠ Device not approved. Starting approval process...{RESET}")
-        approved = key_v2.login(show_banner=True)
-        if approved:
-            print(f"{GREEN}✓ Approval successful! Now running Leo.py{RESET}")
-            return True
-        else:
-            print(f"{RED}✗ Approval failed. Please contact owner to add your device ID to Google Sheets.{RESET}")
-            print(f"{CYAN}Your Device ID: {key_v2.get_device_id()}{RESET}")
-            return False
-
-# Run approval check at startup
-if not check_approval_before_start():
-    print(f"{RED}Exiting...{RESET}")
-    sys.exit(1)
-    
 # ===============================
 # CONFIGURATION
 # ===============================
@@ -559,5 +524,40 @@ def status_display():
                     graph = f"{RED}✗{RESET}"
                 
                 print(f"  {time_str}  {ms_color}{ms_str:>6}{RESET}  {graph}")
-        
-     
+     # ===============================
+# KEY APPROVAL SYSTEM
+# ===============================
+
+import Key_v2
+
+def check_approval_before_start():
+    """Check if device is approved before running main tool"""
+    if Key_v2.check_approval():
+        print(f"{GREEN}✓ Device approved! Running main tool...{RESET}")
+        return True
+    else:
+        print(f"{YELLOW}⚠ Device not approved. Starting approval process...{RESET}")
+        approved = Key_v2.login(show_banner=True)
+        if approved:
+            print(f"{GREEN}✓ Approval successful! Now running Leo.py{RESET}")
+            return True
+        else:
+            print(f"{RED}✗ Approval failed. Please contact owner to add your device ID to Google Sheets.{RESET}")
+            print(f"{CYAN}Your Device ID: {Key_v2.get_device_id()}{RESET}")
+            return False
+
+# ===============================
+# MAIN ENTRY POINT
+# ===============================
+
+if __name__ == "__main__":
+    if check_approval_before_start():
+        get_real_device_info()
+        get_real_network_interfaces()
+        get_real_wifi_info()
+        get_real_gateway_info()
+        get_real_dns_servers()
+        status_display()
+    else:
+        print(f"{RED}Exiting...{RESET}")
+        sys.exit(1)
