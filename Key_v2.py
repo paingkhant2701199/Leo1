@@ -300,8 +300,5 @@ if __name__ == "__main__":
         # Normal approval check
         if main():
             print(f"\n{green}[+] You can run your tool here{reset}")
-            # ဒီနေရာမှာ သင့် tool ကို ထည့်ပါ
-            # import your_tool
-            # your_tool.run()
         else:
             sys.exit(1)
